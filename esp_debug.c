@@ -87,32 +87,32 @@ struct dentry *esp_dump_var(const char *name, struct dentry *parent, void *value
 
         switch(type) {
         case ESP_U8:
-                rc = debugfs_create_u8(name, mode, parent, (u8*)value);
+                debugfs_create_u8(name, mode, parent, (u8*)value);
                 break;
         case ESP_U16:
-                rc = debugfs_create_u16(name, mode, parent, (u16*)value);
+                debugfs_create_u16(name, mode, parent, (u16*)value);
                 break;
         case ESP_U32:
-                rc = debugfs_create_u32(name, mode, parent, (u32*)value);
+                debugfs_create_u32(name, mode, parent, (u32*)value);
                 break;
         case ESP_U64:
-                rc = debugfs_create_u64(name, mode, parent, (u64*)value);
+                debugfs_create_u64(name, mode, parent, (u64*)value);
                 break;
         case ESP_BOOL:
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
-                rc = debugfs_create_bool(name, mode, parent, (u32*)value);
+                debugfs_create_bool(name, mode, parent, (u32*)value);
 #else
-                rc = debugfs_create_bool(name, mode, parent, (bool*)value);
+                debugfs_create_bool(name, mode, parent, (bool*)value);
 #endif
                 break;
         default: //32
-                rc = debugfs_create_u32(name, mode, parent, (u32*)value);
+                debugfs_create_u32(name, mode, parent, (u32*)value);
         }
 
         if (!rc)
                 goto Fail;
         else
-                return rc;
+                return 0;
 Fail:
         debugfs_remove_recursive(esp_debugfs_root);
         esp_debugfs_root = NULL;

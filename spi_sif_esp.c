@@ -2007,7 +2007,7 @@ _err_buf_addr:
 
 
 static int esp_spi_probe(struct spi_device *spi);
-static int esp_spi_remove(struct spi_device *spi); 
+static void esp_spi_remove(struct spi_device *spi); 
 
 static int esp_spi_probe(struct spi_device *spi) 
 {
@@ -2169,7 +2169,7 @@ _err_second_init:
 	return err;
 }
 
-static int esp_spi_remove(struct spi_device *spi) 
+static void esp_spi_remove(struct spi_device *spi) 
 {
         struct esp_spi_ctrl *sctrl = NULL;
 
@@ -2179,7 +2179,7 @@ static int esp_spi_remove(struct spi_device *spi)
 
         if (sctrl == NULL) {
                 esp_dbg(ESP_DBG_ERROR, "esp8089_spi: %s no sctrl\n", __func__);
-                return -EINVAL;
+                return;
         }
 
         do {
@@ -2248,7 +2248,7 @@ static int esp_spi_remove(struct spi_device *spi)
 	
         esp_dbg(ESP_DBG_TRACE, "esp8089_spi: eagle spi remove complete\n");
 
-	return 0;
+	return;
 }
 
 static int esp_spi_suspend(struct device *dev)
@@ -2300,9 +2300,9 @@ static int esp_spi_dummy_probe(struct spi_device *spi)
         return 0;
 }
 
-static int esp_spi_dummy_remove(struct spi_device *spi) 
+static void esp_spi_dummy_remove(struct spi_device *spi) 
 {
-        return 0;
+    return;
 }
 
 struct spi_driver esp_spi_dummy_driver = {

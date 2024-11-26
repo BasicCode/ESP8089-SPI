@@ -32,56 +32,49 @@
 
 int esp_readwrite_file(const char *filename, char *rbuf, const char *wbuf, size_t length)
 {
-        int ret = 0;
-        struct file *filp = (struct file *)-ENOENT;
-        mm_segment_t oldfs;
-        oldfs = get_fs();
-        set_fs(KERNEL_DS);
-        do {
-                int mode = (wbuf) ? O_RDWR | O_CREAT : O_RDONLY;
-                filp = filp_open(filename, mode, (S_IRUSR | S_IWUSR));
-                if (IS_ERR(filp) || !filp->f_op) {
-                        esp_dbg(ESP_DBG_ERROR, "%s: file %s filp_open error\n", __FUNCTION__, filename);
-                        ret = -ENOENT;
-                        break;
-                }
+    int ret = 0;
+    struct file *filp = NULL;
+    loff_t pos = 0;
 
-                if (length==0) {
-                        /* Read the length of the file only */
-                        struct inode    *inode;
+    // Open the file
+    int mode = (wbuf) ? O_RDWR | O_CREAT : O_RDONLY;
+    filp = filp_open(filename, mode, 0644);
+    if (IS_ERR(filp) || !filp->f_op) {
+        esp_dbg(ESP_DBG_ERROR, "%s: file %s filp_open error\n", __FUNCTION__, filename);
+        return -ENOENT;
+    }
 
-                        inode = GET_INODE_FROM_FILEP(filp);
-                        if (!inode) {
-                                esp_dbg(ESP_DBG_ERROR, "%s: Get inode from %s failed\n", __FUNCTION__, filename);
-                                ret = -ENOENT;
-                                break;
-                        }
-                        ret = i_size_read(inode->i_mapping->host);
-                        break;
-                }
-
-                if (wbuf) {
-                        if ( (ret=filp->f_op->write(filp, wbuf, length, &filp->f_pos)) < 0) {
-                                esp_dbg(ESP_DBG_ERROR, "%s: Write %u bytes to file %s error %d\n", __FUNCTION__,
-                                        (unsigned int)length, filename, ret);
-                                break;
-                        }
-                } else {
-                        if ( (ret=filp->f_op->read(filp, rbuf, length, &filp->f_pos)) < 0) {
-                                esp_dbg(ESP_DBG_ERROR, "%s: Read %u bytes from file %s error %d\n", __FUNCTION__,
-                                        (unsigned int)length, filename, ret);
-                                break;
-                        }
-                }
-        } while (0);
-
-        if (!IS_ERR(filp)) {
-                filp_close(filp, NULL);
+    // Read the length of the file only
+    if (length == 0) {
+        struct inode *inode = file_inode(filp);
+        if (!inode) {
+            esp_dbg(ESP_DBG_ERROR, "%s: Get inode from %s failed\n", __FUNCTION__, filename);
+            ret = -ENOENT;
+        } else {
+            ret = i_size_read(inode);
         }
-        set_fs(oldfs);
-
+        filp_close(filp, NULL);
         return ret;
+    }
+
+    if (wbuf) {
+        // Write to the file
+        ret = kernel_write(filp, wbuf, length, &pos);
+        if (ret < 0) {
+            esp_dbg(ESP_DBG_ERROR, "%s: Write %u bytes to file %s error %d\n", __FUNCTION__, (unsigned int)length, filename, ret);
+        }
+    } else {
+        // Read from the file
+        ret = kernel_read(filp, rbuf, length, &pos);
+        if (ret < 0) {
+            esp_dbg(ESP_DBG_ERROR, "%s: Read %u bytes from file %s error %d\n", __FUNCTION__, (unsigned int)length, filename, ret);
+        }
+    }
+
+    filp_close(filp, NULL);
+    return ret;
 }
+
 
 int esp_request_firmware(const struct firmware **firmware_p, const char *name,
                              struct device *device)

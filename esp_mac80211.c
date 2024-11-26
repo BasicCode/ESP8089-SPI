@@ -76,7 +76,7 @@ esp_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 28))
 				struct ieee80211_sta *sta = tx_info->control.sta;
 				struct esp_node * node = (struct esp_node *)sta->drv_priv;
-				if(sta->ht_cap.ht_supported)
+				if(sta->deflink.ht_cap.ht_supported)
 #else
 				struct esp_node * node = esp_get_node_by_addr(epub, wh->addr1);
 				if(node->ht_info.ht_supported)
@@ -449,7 +449,9 @@ static void drv_handle_beacon(struct timer_list *list)
 
 	mdelay(2400 * (cycle_beacon_count % 25) % 10000 /1000);
 	
-	beacon = ieee80211_beacon_get(evif->epub->hw, vif);
+        struct ieee80211_mutable_offsets offs;
+
+	beacon = ieee80211_beacon_get(evif->epub->hw, vif, &offs);
 
 	tim_reach = beacon_tim_alter(beacon);
 
@@ -611,7 +613,7 @@ static int esp_op_config_interface (struct ieee80211_hw *hw,
 static void esp_op_bss_info_changed(struct ieee80211_hw *hw,
                                     struct ieee80211_vif *vif,
                                     struct ieee80211_bss_conf *info,
-                                    u32 changed)
+                                    u64 changed)
 {
         struct esp_pub *epub = (struct esp_pub *)hw->priv;
         struct esp_vif *evif = (struct esp_vif *)vif->drv_priv;
@@ -634,7 +636,7 @@ static void esp_op_bss_info_changed(struct ieee80211_hw *hw,
         sta = sta_info_get(container_of(hw,struct ieee80211_local,hw), epub->wl.bssid);
 
         ht_info = &sta->ht_info;
-        memcpy(node->supp_rates, sta->supp_rates, sizeof(node->supp_rates));
+        memcpy(node->supp_rates, sta->deflink.supp_rates, sizeof(node->supp_rates));
         memcpy(&node->ht_info.cap, &ht_info->cap, sizeof(node->ht_info.cap));
         memcpy(&node->ht_info.ht_supported, &ht_info->ht_supported, sizeof(node->ht_info.ht_supported));
         memcpy(&node->ht_info.ampdu_density, &ht_info->ampdu_density, sizeof(node->ht_info.ampdu_density));
@@ -655,21 +657,21 @@ static void esp_op_bss_info_changed(struct ieee80211_hw *hw,
 	// ESP_IEEE80211_DBG(ESP_DBG_OP, " %s enter: vif addr %pM, changed %x, assoc %x, bssid %pM\n", __func__, vif->addr, changed, info->assoc, info->bssid);
 	// sdata->u.sta.bssid
 
-        ESP_IEEE80211_DBG(ESP_DBG_OP, " %s enter: changed %x, assoc %x, bssid %pM\n", __func__, changed, info->assoc, info->bssid);
+        ESP_IEEE80211_DBG(ESP_DBG_OP, " %s enter: changed %x, assoc %x, bssid %pM\n", __func__, changed, vif->cfg.assoc, info->bssid);
 
         if (vif->type == NL80211_IFTYPE_STATION) {
 		if ((changed & BSS_CHANGED_BSSID) ||
-				((changed & BSS_CHANGED_ASSOC) && (info->assoc)))
+				((changed & BSS_CHANGED_ASSOC) && (vif->cfg.assoc)))
 		{
 			ESP_IEEE80211_DBG(ESP_DBG_TRACE, " %s STA change bssid or assoc\n", __func__);
-			evif->beacon_interval = info->aid;
+			evif->beacon_interval = vif->cfg.aid;
 			memcpy(epub->wl.bssid, (u8*)info->bssid, ETH_ALEN);
-			sip_send_bss_info_update(epub, evif, (u8*)info->bssid, info->assoc);
-		} else if ((changed & BSS_CHANGED_ASSOC) && (!info->assoc)) {
+			sip_send_bss_info_update(epub, evif, (u8*)info->bssid, vif->cfg.assoc);
+		} else if ((changed & BSS_CHANGED_ASSOC) && (!vif->cfg.assoc)) {
 			ESP_IEEE80211_DBG(ESP_DBG_TRACE, " %s STA change disassoc\n", __func__);
 			evif->beacon_interval = 0;
 			memset(epub->wl.bssid, 0, ETH_ALEN);
-			sip_send_bss_info_update(epub, evif, (u8*)info->bssid, info->assoc);
+			sip_send_bss_info_update(epub, evif, (u8*)info->bssid, vif->cfg.assoc);
 		} else {
 			ESP_IEEE80211_DBG(ESP_DBG_TRACE, "%s wrong mode of STA mode\n", __func__);
 		}
@@ -1316,7 +1318,8 @@ static void esp_op_sta_notify(struct ieee80211_hw *hw, struct ieee80211_vif *vif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0))
 static int esp_op_conf_tx(struct ieee80211_hw *hw, 
 			  struct ieee80211_vif *vif,
-			  u16 queue,
+			  unsigned int queue,
+                          u16 txop,
                           const struct ieee80211_tx_queue_params *params)
 
 #else
@@ -1646,7 +1649,7 @@ static int esp_op_ampdu_action(struct ieee80211_hw *hw,
 #endif
 			||
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 28))
-                        !sta->ht_cap.ht_supported
+                        !sta->deflink.ht_cap.ht_supported
 #else
                         !node->ht_info.ht_supported
 #endif
@@ -1778,7 +1781,7 @@ static int esp_op_ampdu_action(struct ieee80211_hw *hw,
 #endif
 			||
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 28))
-                        !sta->ht_cap.ht_supported
+                        !sta->deflink.ht_cap.ht_supported
 #else
                         !node->ht_info.ht_supported
 #endif
